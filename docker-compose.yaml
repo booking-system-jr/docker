@@ -1,0 +1,158 @@
+version: '3.8'
+
+services:
+  db-user:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${USER_POSTGRES_DB}
+      POSTGRES_USER: ${USER_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${USER_POSTGRES_PASSWORD}
+    volumes:
+      - db_user_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${USER_POSTGRES_USER} -d ${USER_POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend
+
+  db-listing:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${LISTING_POSTGRES_DB}
+      POSTGRES_USER: ${LISTING_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${LISTING_POSTGRES_PASSWORD}
+    volumes:
+      - db_listing_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${LISTING_POSTGRES_USER} -d ${LISTING_POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend
+
+  db-booking:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${BOOKING_POSTGRES_DB}
+      POSTGRES_USER: ${BOOKING_POSTGRES_USER}
+      POSTGRES_PASSWORD: ${BOOKING_POSTGRES_PASSWORD}
+    volumes:
+      - db_booking_data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${BOOKING_POSTGRES_USER} -d ${BOOKING_POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backend
+
+  discovery-service:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.discovery
+    environment:
+      - EUREKA_DEFAULT_ZONE=${EUREKA_DEFAULT_ZONE}
+    ports:
+      - "8761:8761"
+    networks:
+      - backend
+
+  user-service:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.user-service
+    environment:
+      - POSTGRES_HOST=db-user
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${USER_POSTGRES_DB}
+      - POSTGRES_USER=${USER_POSTGRES_USER}
+      - POSTGRES_PASSWORD=${USER_POSTGRES_PASSWORD}
+      - JWT_KEYSTORE_PASSWORD=${USER_JWT_KEYSTORE_PASSWORD}
+      - JWT_KEY_PASSWORD=${USER_JWT_KEY_PASSWORD}
+      - JWT_KEYSTORE_ALIAS=${USER_JWT_KEYSTORE_ALIAS}
+      - EUREKA_DEFAULT_ZONE=${EUREKA_DEFAULT_ZONE}
+    ports:
+      - "9091:9091"
+    depends_on:
+      db-user:
+        condition: service_healthy
+      discovery-service:
+        condition: service_started
+    networks:
+      - backend
+
+  listing-service:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.listing-service
+    environment:
+      - POSTGRES_HOST=db-listing
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${LISTING_POSTGRES_DB}
+      - POSTGRES_USER=${LISTING_POSTGRES_USER}
+      - POSTGRES_PASSWORD=${LISTING_POSTGRES_PASSWORD}
+      - JWT_ISSUER_URI=${LISTING_JWT_ISSUER_URI}
+      - JWT_JWK_SET_URI=${LISTING_JWT_JWK_SET_URI}
+      - EUREKA_DEFAULT_ZONE=${EUREKA_DEFAULT_ZONE}
+    ports:
+      - "9090:9090"
+    depends_on:
+      db-listing:
+        condition: service_healthy
+      discovery-service:
+        condition: service_started
+    networks:
+      - backend
+
+  booking-service:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.booking-service
+    environment:
+      - POSTGRES_HOST=db-booking
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${BOOKING_POSTGRES_DB}
+      - POSTGRES_USER=${BOOKING_POSTGRES_USER}
+      - POSTGRES_PASSWORD=${BOOKING_POSTGRES_PASSWORD}
+      - EUREKA_DEFAULT_ZONE=${EUREKA_DEFAULT_ZONE}
+    ports:
+      - "8081:8081"
+    depends_on:
+      db-booking:
+        condition: service_healthy
+      discovery-service:
+        condition: service_started
+    networks:
+      - backend
+
+  api-gateway:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api-gateway
+    environment:
+      - EUREKA_DEFAULT_ZONE=${EUREKA_DEFAULT_ZONE}
+    ports:
+      - "8080:8080"
+    depends_on:
+      discovery-service:
+        condition: service_started
+    networks:
+      - backend
+
+volumes:
+  db_user_data:
+  db_listing_data:
+  db_booking_data:
+
+networks:
+  backend:
+    driver: bridge

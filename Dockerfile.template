@@ -1,0 +1,13 @@
+# Multi-stage Dockerfile template for Spring Boot 4 (Java 21)
+# Build stage
+FROM maven:3.9.5-eclipse-temurin-21 AS build
+WORKDIR /workspace
+COPY . /workspace
+RUN mvn -B -DskipTests package
+
+# Runtime stage
+FROM eclipse-temurin:21-jre-jammy
+ARG JAR_FILE=target/*.jar
+COPY --from=build /workspace/${JAR_FILE} app.jar
+EXPOSE 8080
+ENTRYPOINT ["java","-jar","/app.jar"]
