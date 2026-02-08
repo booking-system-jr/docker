@@ -103,8 +103,6 @@ services:
       - JWT_ISSUER_URI=${LISTING_JWT_ISSUER_URI}
       - JWT_JWK_SET_URI=${LISTING_JWT_JWK_SET_URI}
       - EUREKA_DEFAULT_ZONE=${EUREKA_DEFAULT_ZONE}
-    ports:
-      - "9090:9090"
     depends_on:
       db-listing:
         condition: service_healthy
